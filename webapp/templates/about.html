@@ -1,0 +1,146 @@
+{% extends "base.html" %}
+{% block title %}About{% endblock %}
+
+{% block extra_head %}
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.css">
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.js"></script>
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/contrib/auto-render.min.js"
+  onload="renderMathInElement(document.body, {
+    delimiters: [
+      {left: '$$', right: '$$', display: true},
+      {left: '\\(', right: '\\)', display: false}
+    ],
+    throwOnError: false
+  });"></script>
+{% endblock %}
+
+{% block page_header %}
+<div class="page-header">
+  <h2>About the method</h2>
+  <p>
+    How KIQFL combines hybrid CNN–QNN clients, central-server aggregation,
+    and fidelity-guided weights in a classical state-vector simulator.
+  </p>
+</div>
+{% endblock %}
+
+{% block content %}
+<section class="content-section prose-stack">
+  <p>
+    Federated learning lets many devices improve a shared model without pooling raw data.
+    In this project the shared model always lives on a <strong>central server</strong>:
+    each round the server broadcasts parameters \(\omega_{\mathrm{global}}\), clients train on private
+    data \(D_n\), and the server aggregates the returned parameter updates.
+  </p>
+  <p>
+    <strong>KIQFL</strong> (KAN-Enhanced Indirect Quantum Federated Learning) keeps that
+    classical FL skeleton and adds a quantum-inspired <em>weighting</em> step.
+    Each Hybrid CNN–QNN client also exposes a circuit statevector \(\lvert\psi_n\rangle\).
+    Those states may be mixed on a ring by a discrete-time quantum walk (DTQW);
+    a Kolmogorov–Arnold network (KAN) sets a mixing strength \(\alpha\) between each local
+    state and its walked neighbor state. Aggregation weights then come from pure-state
+    fidelity to the <em>previous</em> global circuit state. Parameter exchange itself remains
+    server-centric—it is not a peer-to-peer parameter protocol.
+  </p>
+</section>
+
+<section class="content-section" id="architecture">
+  <h3>System architecture</h3>
+  <div class="prose-stack" style="margin-bottom:1rem;">
+    <p>
+      \(N\) clients train for \(K\) local epochs, then send updates to the server.
+      The server builds a new \(\omega_{\mathrm{global}}\) with fidelity-guided aggregation
+      (KIQFL) or with baseline rules (FedAvg / FQNGD) and broadcasts it for the next round.
+    </p>
+  </div>
+
+  <figure class="figure-block">
+    <img src="{{ url_for('static', filename='images/arch-central-server.png') }}?v=2" alt="Central server federated architecture with DTQW guidance">
+    <figcaption>Fig. 1 — Star-topology FL. The ring is used for circuit-state guidance, not for exchanging model parameters.</figcaption>
+  </figure>
+
+  <h3 style="margin-top:1.5rem;">Hybrid CNN–QNN client model</h3>
+  <div class="figure-grid">
+    <div class="prose-stack">
+      <p>
+        A classical CNN extracts a feature vector, which is padded or truncated to length
+        \(2^{n}\) and \(\ell_2\)-normalized for <strong>amplitude encoding</strong>.
+        A layered parameterized circuit (typically \(R_y\) rotations and nearest-neighbor
+        CNOTs, with optional simulated NISQ noise and optional QAOA layers) evolves the state.
+        Computational-basis probabilities feed a classical linear head.
+        Training uses state-vector simulation with autograd through the circuit—not a claim
+        of real-QPU wall-clock advantage.
+      </p>
+      <p><strong>Amplitude encoding</strong> of a real feature vector \(x\):</p>
+      <div class="equation">
+        $$\lvert\psi_{\mathrm{enc}}(x)\rangle = \frac{1}{\lVert x\rVert}\sum_{i=0}^{2^{n}-1} x_i\lvert i\rangle$$
+      </div>
+      <p><strong>Parameterized circuit</strong> (layer product; \(L\) variational layers):</p>
+      <div class="equation">
+        $$U(\theta)=\prod_{\ell=1}^{L} U_\ell(\theta_\ell),\qquad
+        \lvert\psi_{\mathrm{out}}\rangle = U(\theta)\lvert\psi_{\mathrm{enc}}\rangle$$
+      </div>
+    </div>
+    <figure class="figure-block square" style="margin:0;">
+      <img src="{{ url_for('static', filename='images/hybrid-cnn-qnn.png') }}?v=2" alt="Hybrid CNN to quantum circuit to classical readout">
+      <figcaption>Fig. 2 — Hybrid CNN–QNN stack used on each client.</figcaption>
+    </figure>
+  </div>
+</section>
+
+<section class="content-section" id="aggregation">
+  <h3>Fidelity-guided aggregation</h3>
+  <div class="prose-stack">
+    <p>
+      After local training, each participating client uploads model parameters \(\omega_n\)
+      and a circuit state \(\lvert\psi_n\rangle\) (optionally after DTQW+KAN mixing).
+      KIQFL scores clients with pure-state fidelity against the previous global circuit state
+      \(\lvert\psi_{\mathrm{global}}\rangle\):
+    </p>
+  </div>
+  <div class="equation">
+    $$F\!\big(\lvert\psi_n\rangle,\lvert\psi_{\mathrm{global}}\rangle\big)
+    =\big\lvert\langle\psi_n\mid\psi_{\mathrm{global}}\rangle\big\rvert^{2}$$
+  </div>
+  <div class="prose-stack">
+    <p>
+      Non-negative weights are normalized and applied to the <em>classical</em> parameter
+      tensors (not to a coherent sum of quantum states):
+    </p>
+  </div>
+  <div class="equation">
+    $$w_n=\frac{F_n}{\sum_{j} F_j},\qquad
+    \omega_{\mathrm{global}}\leftarrow\sum_{n} w_n\,\omega_n$$
+  </div>
+  <figure class="figure-block">
+    <img src="{{ url_for('static', filename='images/fidelity-aggregation.png') }}?v=2" alt="Fidelity between client states and global state controlling aggregation weights">
+    <figcaption>Fig. 3 — Higher fidelity to the previous global circuit state yields a larger weight on that client’s parameters.</figcaption>
+  </figure>
+</section>
+
+<section class="content-section" id="algorithm">
+  <h3>One KIQFL round</h3>
+  <div class="algorithm-box">
+    <p><strong>Input:</strong> global rounds \(R\), local epochs \(K\), clients \(N\), learning rate \(\eta\)</p>
+    <div class="algo-block"><span class="algo-step">[1]</span> For each global round \(r = 1 \ldots R\):</div>
+    <div class="algo-indent">
+      <div class="algo-line">Server broadcasts \(\omega_{\mathrm{global}}^{(r)}\)</div>
+      <div class="algo-line">Selected clients train locally for \(K\) epochs on the Hybrid CNN–QNN</div>
+      <div class="algo-line">Clients upload parameters \(\omega_n\) and circuit states \(\lvert\psi_n\rangle\)</div>
+      <div class="algo-line">Server mixes guidance states with DTQW on a ring; KAN sets \(\alpha\) for local–walked blending</div>
+      <div class="algo-line">Server aggregates parameters with fidelity weights vs \(\lvert\psi_{\mathrm{global}}^{(r)}\rangle\) (previous round)</div>
+      <div class="algo-line">Server extracts the next global circuit state from the updated global model</div>
+    </div>
+    <p style="margin-top:1rem;"><strong>Output:</strong> final global model \(\omega^\star = \omega_{\mathrm{global}}^{(R)}\)</p>
+  </div>
+</section>
+
+<section class="content-section">
+  <h3>Scope — what we do not claim</h3>
+  <ul>
+    <li>We do not remove the central server or run fully peer-to-peer parameter exchange.</li>
+    <li>We do not claim wall-clock speedup on real QPUs; this codebase uses classical state-vector simulation.</li>
+    <li>Privacy still needs DP (optional Opacus) when required—the uncertainty principle alone is not a privacy proof.</li>
+  </ul>
+</section>
+{% endblock %}

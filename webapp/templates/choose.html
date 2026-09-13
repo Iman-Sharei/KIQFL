@@ -1,0 +1,26 @@
+{% extends "base.html" %}
+{% block title %}Choose Data{% endblock %}
+
+{% block page_header %}
+<div class="page-header text-center">
+  <h2>🧪 Choose a data source</h2>
+  <p>Benchmark images for classification, or your own table for quantum regression.</p>
+</div>
+{% endblock %}
+
+{% block content %}
+<div class="data-cards">
+  <div class="data-card">
+    <img src="{{ url_for('static', filename='images/dataset-lattice.png') }}" alt="MNIST digits as a quantum lattice">
+    <h3>📁 Standard datasets</h3>
+    <p>Classification on <strong>MNIST</strong>, <strong>Fashion-MNIST</strong>, <strong>CIFAR-10</strong>, or <strong>CIFAR-100</strong>.</p>
+    <a href="/simulate" class="btn btn-primary">Use Standard Data</a>
+  </div>
+  <div class="data-card">
+    <img src="{{ url_for('static', filename='images/csv-wave.png') }}" alt="CSV rows encoded as a quantum waveform">
+    <h3>📤 Upload CSV</h3>
+    <p>Tabular features for quantum federated <strong>regression</strong> with column selection.</p>
+    <a href="/simulate_own" class="btn btn-secondary">Upload &amp; Configure</a>
+  </div>
+</div>
+{% endblock %}

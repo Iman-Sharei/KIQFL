@@ -1,0 +1,79 @@
+{% extends "base.html" %}
+{% block title %}Repository{% endblock %}
+
+{% block page_header %}
+<div class="page-header text-center">
+  <h2>Source &amp; quick start</h2>
+  <p>Clone the repository, install dependencies, then run the web UI or a short experiment suite.</p>
+</div>
+{% endblock %}
+
+{% block content %}
+<div class="github-card card">
+  <img class="github-logo" src="{{ url_for('static', filename='images/github-mark.svg') }}" alt="GitHub logo" width="72" height="72">
+  <p class="gh-blurb">
+    <strong>KIQFL</strong> is an open research codebase for hybrid quantum–classical federated learning:
+    central-server aggregation, Hybrid CNN–QNN clients, and fidelity-guided weights under simulated NISQ noise.
+  </p>
+  <a class="gh-link" href="https://github.com/Iman-Sharei" target="_blank" rel="noopener noreferrer">
+    <img src="{{ url_for('static', filename='images/github-mark.svg') }}" alt="" width="22" height="22" aria-hidden="true">
+    github.com/Iman-Sharei
+  </a>
+
+  <div class="quickstart">
+    <h3>Quick start</h3>
+    <p class="quickstart-hint">From the project root (with your virtualenv activated):</p>
+
+    <div class="cmd-block">
+      <div class="cmd-block-head">
+        <span>Install</span>
+        <button type="button" class="btn-copy" data-copy="pip install -r requirements.txt">Copy</button>
+      </div>
+      <pre><code>pip install -r requirements.txt</code></pre>
+    </div>
+
+    <div class="cmd-block">
+      <div class="cmd-block-head">
+        <span>Web UI</span>
+        <button type="button" class="btn-copy" data-copy="python -m webapp">Copy</button>
+      </div>
+      <pre><code>python -m webapp</code></pre>
+    </div>
+
+    <div class="cmd-block">
+      <div class="cmd-block-head">
+        <span>Quick experiment</span>
+        <button type="button" class="btn-copy" data-copy="python -m core experiments --quick --suite main">Copy</button>
+      </div>
+      <pre><code>python -m core experiments --quick --suite main</code></pre>
+    </div>
+
+    <p class="quickstart-hint">
+      Then open <code>http://127.0.0.1:5000</code>. Full CLI help: <code>python -m core --help</code>
+    </p>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+document.querySelectorAll(".btn-copy").forEach(function (btn) {
+  btn.addEventListener("click", async function () {
+    var text = btn.getAttribute("data-copy") || "";
+    try {
+      await navigator.clipboard.writeText(text);
+      var prev = btn.textContent;
+      btn.textContent = "Copied";
+      btn.classList.add("copied");
+      setTimeout(function () {
+        btn.textContent = prev;
+        btn.classList.remove("copied");
+      }, 1600);
+    } catch (err) {
+      btn.textContent = "Failed";
+      setTimeout(function () { btn.textContent = "Copy"; }, 1600);
+    }
+  });
+});
+</script>
+{% endblock %}

@@ -1,0 +1,10 @@
+{% extends "base.html" %}
+{% block title %}Error{% endblock %}
+
+{% block content %}
+<div class="error-box">
+  <h2>⚠️ Configuration Error</h2>
+  <p style="color:var(--text-muted); margin:1rem 0 1.5rem;">{{ error_message }}</p>
+  <a href="/simulate" class="btn btn-primary">← Back to Setup</a>
+</div>
+{% endblock %}

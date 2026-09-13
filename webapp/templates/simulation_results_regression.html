@@ -1,0 +1,98 @@
+{% extends "base.html" %}
+{% block title %}Regression Results{% endblock %}
+
+{% block extra_head %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+{% endblock %}
+
+{% block page_header %}
+<div class="page-header">
+  <h2>📈 Regression Results</h2>
+  <p>Quantum federated regression on your uploaded CSV data.</p>
+</div>
+{% endblock %}
+
+{% block content %}
+<div class="summary-box">
+  Predicting <strong>{{ selected_feature_config.get("output_feature", "target") }}</strong> from selected input features.
+</div>
+
+<div class="status-pill" id="statusPill">⏳ Connecting…</div>
+
+<div class="btn-group">
+  <a href="/simulate_own" class="btn btn-ghost">← Back to Setup</a>
+  <button id="stopBtn" class="btn btn-danger">⏹ Stop &amp; save config</button>
+  <button id="downloadBtn" class="btn btn-success" style="display:none;">📥 Download CSV</button>
+  <button id="downloadMsePNGBtn" class="btn btn-secondary" style="display:none;">MSE PNG</button>
+  <button id="downloadMsePDFBtn" class="btn btn-secondary" style="display:none;">MSE PDF</button>
+</div>
+
+<table class="results-table" id="resultsTable">
+  <thead><tr><th>Epoch</th><th>MSE</th></tr></thead>
+  <tbody></tbody>
+</table>
+
+<div class="chart-wrap"><canvas id="mseChart"></canvas></div>
+{% endblock %}
+
+{% block scripts %}
+<script src="{{ url_for('static', filename='chart-export.js') }}"></script>
+<script src="{{ url_for('static', filename='checkpoint.js') }}"></script>
+<script>
+const hp = {{ regression_hyperparams | tojson }};
+const params = {
+  num_clients: hp.num_clients || 3,
+  local_epochs: hp.local_epochs || 1,
+  global_epochs: hp.global_epochs || 100,
+  num_qubits: hp.num_qubits || 10,
+  num_layers: hp.num_layers || 1,
+  learning_rate: hp.learning_rate || 0.01
+};
+const evtSource = new EventSource("/stream_simulation_regression?" + new URLSearchParams(params));
+const tableBody = document.querySelector("#resultsTable tbody");
+const epochs = [], mseData = [];
+
+const mseChart = new Chart(document.getElementById('mseChart'), {
+  type: 'line',
+  data: { labels: epochs, datasets: [{ label: 'MSE', data: mseData, borderColor: '#fbbf24', backgroundColor: 'rgba(251,191,36,0.15)', fill: true, tension: 0.3 }] },
+  options: {
+    responsive: true,
+    plugins: { legend: { labels: { color: '#94a3b8' } } },
+    scales: {
+      x: { ticks: { color: '#94a3b8' }, grid: { color: 'rgba(148,163,184,0.1)' } },
+      y: { ticks: { color: '#94a3b8' }, grid: { color: 'rgba(148,163,184,0.1)' } }
+    }
+  }
+});
+
+function showDownloads() {
+  ['downloadBtn','downloadMsePNGBtn','downloadMsePDFBtn'].forEach(id => document.getElementById(id).style.display = 'inline-flex');
+}
+
+evtSource.onmessage = function(event) {
+  const result = JSON.parse(event.data);
+  if (result.complete) {
+    evtSource.close();
+    document.getElementById('statusPill').textContent = result.stopped ? '⏹ Stopped — config saved' : '✅ Complete';
+    if (result.checkpoint) KiqflCheckpoint.show(result.checkpoint);
+    showDownloads();
+    return;
+  }
+  const row = document.createElement("tr");
+  row.innerHTML = `<td>${result.global_epoch}</td><td>${result.mse.toFixed(4)}</td>`;
+  tableBody.appendChild(row);
+  epochs.push(result.global_epoch);
+  mseData.push(result.mse);
+  mseChart.update();
+  document.getElementById('statusPill').textContent = `🔄 Epoch ${result.global_epoch} — MSE: ${result.mse.toFixed(4)}`;
+};
+
+document.getElementById("downloadBtn").onclick = () => { window.location.href = "/download_csv"; };
+document.getElementById("downloadMsePNGBtn").onclick = () => KiqflChartExport.downloadChartPng(mseChart, "mse_chart.png");
+document.getElementById("downloadMsePDFBtn").onclick = () => { const { jsPDF } = window.jspdf; const pdf = new jsPDF(); pdf.addImage(KiqflChartExport.chartDataUrl(mseChart), "PNG", 15, 40, 180, 160); pdf.save("mse_chart.pdf"); };
+document.getElementById("stopBtn").onclick = () => {
+  KiqflCheckpoint.stopAndSave(evtSource, "regression", params, epochs.length);
+};
+</script>
+{% endblock %}

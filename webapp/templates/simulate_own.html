@@ -1,0 +1,109 @@
+{% extends "base.html" %}
+{% block title %}Custom Data{% endblock %}
+
+{% block page_header %}
+<div class="page-header">
+  <h2>📤 Custom CSV Regression</h2>
+  <p>Upload tabular data, select input features and target column, then run quantum federated regression.</p>
+</div>
+{% endblock %}
+
+{% block content %}
+<form class="form-card" id="simulationForm">
+  <div class="form-section">
+    <h3>Data &amp; Model</h3>
+    <label for="fl_type">Type of FL</label>
+    <input type="text" id="fl_type" name="fl_type" value="Quantum Federated Learning" readonly>
+    <label for="upload_dataset">Upload Dataset (CSV)</label>
+    <input type="file" id="upload_dataset" name="upload_dataset" accept=".csv" required>
+    <label for="data_type">Data Type</label>
+    <select id="data_type" name="data_type"><option value="csv" selected>CSV</option></select>
+  </div>
+
+  <div class="form-section green">
+    <h3>Federated Parameters</h3>
+    <div class="form-grid">
+      <div><label for="num_clients">Clients</label><input type="number" id="num_clients" name="num_clients" min="2" max="100" value="3" required></div>
+      <div><label for="local_epochs">Local Epochs</label><input type="number" id="local_epochs" name="local_epochs" min="1" max="100" value="1"></div>
+      <div><label for="global_epochs">Global Epochs</label><input type="number" id="global_epochs" name="global_epochs" min="1" max="500" value="100"></div>
+      <div><label for="learning_rate">Learning Rate</label><input type="number" id="learning_rate" name="learning_rate" min="0.0001" max="0.5" step="any" value="0.01"></div>
+    </div>
+  </div>
+
+  <div class="form-section amber">
+    <h3>Quantum Parameters</h3>
+    <div class="form-grid">
+      <div><label for="num_qubits">Qubits (n)</label><input type="number" id="num_qubits" name="num_qubits" min="1" value="10" required></div>
+      <div><label for="num_layers">Layers (L)</label><input type="number" id="num_layers" name="num_layers" min="1" value="1" required></div>
+    </div>
+    <label for="quantum_encoding">Encoding</label>
+    <select id="quantum_encoding" name="quantum_encoding"><option value="amplitude" selected>Amplitude</option></select>
+    <label for="ansatz">Ansatz</label>
+    <select id="ansatz" name="ansatz"><option value="pqc" selected>Parameterized Quantum Circuit</option></select>
+    <label for="measurement">Measurement</label>
+    <select id="measurement" name="measurement"><option value="probability" selected>Pauli-Z</option></select>
+    <label for="differential">Differentiation</label>
+    <select id="differential" name="differential"><option value="parameter_shift" selected>Parameter Shift</option></select>
+    <label for="loss_function">Loss</label>
+    <select id="loss_function" name="loss_function"><option value="mse" selected>MSE (Regression)</option></select>
+    <label for="optimizer">Optimizer</label>
+    <select id="optimizer" name="optimizer"><option value="adam" selected>Adam</option></select>
+  </div>
+
+  <div class="text-center mt-2">
+    <button type="submit" class="btn btn-primary">Upload &amp; Select Features</button>
+  </div>
+</form>
+
+<div id="featureModal" class="modal" style="display:none;">
+  <div class="modal-content">
+    <h3>Select Features for Simulation</h3>
+    <form id="featureForm" method="POST" action="/start_simulation_custom_final">
+      <input type="hidden" name="num_clients" id="modal_num_clients">
+      <input type="hidden" name="local_epochs" id="modal_local_epochs">
+      <input type="hidden" name="global_epochs" id="modal_global_epochs">
+      <input type="hidden" name="num_qubits" id="modal_num_qubits">
+      <input type="hidden" name="num_layers" id="modal_num_layers">
+      <input type="hidden" name="learning_rate" id="modal_learning_rate">
+      <div id="featureSelectionArea"></div>
+      <label for="output_feature">Output Feature (Target)</label>
+      <select id="output_feature" name="output_feature" required></select>
+      <div class="btn-group" style="margin-top:1.25rem;">
+        <button type="submit" class="btn btn-success">Start Simulation</button>
+        <button type="button" class="btn btn-ghost" onclick="document.getElementById('featureModal').style.display='none'">Cancel</button>
+      </div>
+    </form>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+const form = document.getElementById("simulationForm");
+form.addEventListener("submit", function (e) {
+  e.preventDefault();
+  const file = document.getElementById("upload_dataset").files[0];
+  if (!file) return;
+  const formData = new FormData();
+  formData.append("upload_dataset", file);
+  fetch("/get_headers", { method: "POST", body: formData })
+    .then(r => r.json())
+    .then(data => {
+      if (!data.headers) { alert(data.error || "Could not read CSV."); return; }
+      const featureArea = document.getElementById("featureSelectionArea");
+      const outputDropdown = document.getElementById("output_feature");
+      featureArea.innerHTML = "";
+      outputDropdown.innerHTML = "";
+      data.headers.forEach(col => {
+        featureArea.innerHTML += `<div class="feature-row"><span>${col}</span><select name="include_${col}"><option value="yes">Input</option><option value="no">Skip</option></select></div>`;
+        outputDropdown.innerHTML += `<option value="${col}">${col}</option>`;
+      });
+      ["num_clients","local_epochs","global_epochs","num_qubits","num_layers","learning_rate"].forEach(id => {
+        document.getElementById("modal_" + id).value = document.getElementById(id).value;
+      });
+      document.getElementById("featureModal").style.display = "flex";
+    })
+    .catch(() => alert("Error reading CSV file."));
+});
+</script>
+{% endblock %}

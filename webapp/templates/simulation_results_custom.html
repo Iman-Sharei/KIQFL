@@ -1,0 +1,44 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title></title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}">
+  <style>
+    /* Feel free to adjust the styling as needed */
+    body { font-family: Arial, sans-serif; margin: 20px; }
+    h1, h2, h3 { color: #333; }
+    ul { list-style-type: disc; margin-left: 20px; }
+    .btn-main { display: inline-block; padding: 10px 20px; background-color: #007BFF; color: white; border: none; border-radius: 4px; text-decoration: none; }
+    .btn-main:hover { background-color: #0056b3; }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>Custom Simulation Results</h1>
+    <nav>
+      <ul>
+        <li><a href="/" class="{{ 'active' if request.path == '/' else '' }}">Home</a></li>
+
+      </ul>
+    </nav>
+  </header>
+  <main>
+    <h2>Custom Simulation Configuration</h2>
+    <p>The following configuration was chosen:</p>
+    <h3>Selected Features:</h3>
+    <ul>
+      {% for feature, selection in result.selected_features.items() %}
+        <li>{{ feature }}: {{ selection }}</li>
+      {% endfor %}
+    </ul>
+    <p><strong>Output Feature:</strong> {{ result.output_feature }}</p>
+    <br>
+    <a href="/choose" class="btn-main">back to Setup</a>
+  </main>
+  <footer>
+    <p></p>
+  </footer>
+</body>
+</html>

@@ -1,0 +1,66 @@
+# Virtual environments (never commit)
+.venv/
+venv/
+env/
+ENV/
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+dist/
+*.egg-info/
+.eggs/
+wheels/
+
+# Jupyter
+.ipynb_checkpoints/
+
+# Checkpoints / weights
+*.pt
+*.pth
+*.ckpt
+
+# Experiment outputs (created at runtime)
+result/
+*.csv
+*.log
+logs/
+
+# Datasets (downloaded at runtime into ./data/)
+data/
+MNIST/
+CIFAR10/
+CIFAR100/
+FashionMNIST/
+*.gz
+*.tar
+*.zip
+
+# IDE / OS / agent tooling
+.idea/
+.vscode/
+.cursor/
+.claude/
+*.swp
+*~
+.DS_Store
+Thumbs.db
+
+# Secrets / env
+.env
+.env.local
+
+# Flask
+instance/
+.webassets-cache
+
+# Tests / coverage
+.pytest_cache/
+.coverage
+htmlcov/
+.tox/
+.cache

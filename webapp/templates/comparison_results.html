@@ -1,0 +1,219 @@
+{% extends "base.html" %}
+{% block title %}Comparison Results{% endblock %}
+
+{% block extra_head %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+{% endblock %}
+
+{% block page_header %}
+<div class="page-header">
+  <h2>📊 Comparison Results</h2>
+  <p>Side-by-side evaluation of federated learning algorithms.</p>
+</div>
+{% endblock %}
+
+{% block content %}
+<div class="summary-box">
+  <strong>Dataset:</strong> {{ dataset }} &nbsp;|&nbsp;
+  <strong>Clients:</strong> {{ num_clients }} &nbsp;|&nbsp;
+  <strong>Rounds:</strong> {{ global_epochs }} &nbsp;|&nbsp;
+  <strong>Qubits:</strong> {{ num_qubits }} &nbsp;|&nbsp;
+  <strong>Layers:</strong> {{ num_layers }}
+  <p id="currentStatus" class="help-text" style="margin-top:0.75rem;">⏳ Initializing comparison…</p>
+</div>
+
+<div class="btn-group">
+  <a href="/compare" class="btn btn-ghost">← Back to Setup</a>
+  <button id="stopBtn" type="button" class="btn btn-danger">⏹ Stop &amp; save config</button>
+</div>
+
+<div class="chart-grid">
+  <div class="chart-wrap"><h3 style="text-align:center;margin-bottom:0.75rem;font-size:1rem;">Accuracy</h3><canvas id="accuracyChart"></canvas></div>
+  <div class="chart-wrap"><h3 style="text-align:center;margin-bottom:0.75rem;font-size:1rem;">Loss</h3><canvas id="lossChart"></canvas></div>
+  <div class="chart-wrap"><h3 style="text-align:center;margin-bottom:0.75rem;font-size:1rem;">Fidelity (Quantum)</h3><canvas id="fidelityChart"></canvas></div>
+</div>
+
+<div class="btn-group" id="downloadSection" style="display:none; justify-content:center;">
+  <button class="btn btn-success" onclick="downloadCSV()">📥 Download CSV</button>
+  <button class="btn btn-secondary" onclick="downloadAccuracyPNG()">Accuracy PNG</button>
+  <button class="btn btn-secondary" onclick="downloadLossPNG()">Loss PNG</button>
+  <button class="btn btn-secondary" onclick="downloadFidelityPNG()">Fidelity PNG</button>
+</div>
+
+<h3 class="section-title" style="font-size:1.2rem;">Final Summary</h3>
+<table class="results-table" id="summaryTable">
+  <thead><tr><th>Algorithm</th><th>Final Accuracy</th><th>Final Loss</th><th>Avg Fidelity</th><th>Best Accuracy</th></tr></thead>
+  <tbody id="summaryBody"><tr><td colspan="5">Waiting for results…</td></tr></tbody>
+</table>
+
+<details>
+  <summary>📋 Detailed Epoch-by-Epoch Results</summary>
+  <div class="detail-scroll">
+    <table class="results-table" id="detailTable">
+      <thead><tr><th>Method</th><th>Epoch</th><th>Loss</th><th>Accuracy</th><th>Fidelity</th></tr></thead>
+      <tbody id="detailBody"></tbody>
+    </table>
+  </div>
+</details>
+{% endblock %}
+
+{% block scripts %}
+<script src="{{ url_for('static', filename='chart-export.js') }}"></script>
+<script src="{{ url_for('static', filename='checkpoint.js') }}"></script>
+<script>
+const config = {
+  dataset: "{{ dataset }}", num_clients: "{{ num_clients }}", local_epochs: "{{ local_epochs }}",
+  global_epochs: "{{ global_epochs }}", num_qubits: "{{ num_qubits }}", num_layers: "{{ num_layers }}",
+  learning_rate: "{{ learning_rate }}", sporadic_p: "{{ sporadic_p }}", theta_walk: "{{ theta_walk }}",
+  phi_walk: "{{ phi_walk }}", nisq_error_rate: "{{ nisq_error_rate }}", data_fraction: "{{ data_fraction }}",
+  algorithms: "{{ algorithms }}"
+};
+const colors = {
+  'KIQFL': { line: '#8b5cf6', fill: 'rgba(139,92,246,0.15)' },
+  'FedAvg': { line: '#34d399', fill: 'rgba(52,211,153,0.12)' },
+  'FQNGD': { line: '#fbbf24', fill: 'rgba(251,191,36,0.12)' },
+  'Centralized': { line: '#fb7185', fill: 'rgba(251,113,133,0.12)' }
+};
+function colorFor(method) {
+  const key = Object.keys(colors).find(k => method.toUpperCase().includes(k.toUpperCase()));
+  return colors[key] || { line: '#888', fill: 'rgba(136,136,136,0.1)' };
+}
+const allData = {};
+const chartOpts = {
+  responsive: true,
+  plugins: { legend: { labels: { color: '#94a3b8' } } },
+  scales: {
+    x: { ticks: { color: '#94a3b8' }, grid: { color: 'rgba(148,163,184,0.1)' } },
+    y: { ticks: { color: '#94a3b8' }, grid: { color: 'rgba(148,163,184,0.1)' } }
+  }
+};
+
+// Open the stream first so a Chart.js CDN failure cannot block training.
+document.getElementById('currentStatus').textContent = '🔗 Connecting to comparison stream…';
+const evtSource = new EventSource("/stream_comparison?" + new URLSearchParams(config));
+
+let accuracyChart, lossChart, fidelityChart;
+try {
+  accuracyChart = new Chart(document.getElementById('accuracyChart'), { type: 'line', data: { labels: [], datasets: [] }, options: { ...chartOpts, scales: { ...chartOpts.scales, y: { ...chartOpts.scales.y, min: 0, max: 1 } } } });
+  lossChart = new Chart(document.getElementById('lossChart'), { type: 'line', data: { labels: [], datasets: [] }, options: chartOpts });
+  fidelityChart = new Chart(document.getElementById('fidelityChart'), { type: 'line', data: { labels: [], datasets: [] }, options: { ...chartOpts, scales: { ...chartOpts.scales, y: { ...chartOpts.scales.y, min: 0, max: 1 } } } });
+} catch (err) {
+  document.getElementById('currentStatus').textContent = '⚠️ Charts unavailable; training stream still running. ' + err;
+}
+
+evtSource.onopen = () => {
+  document.getElementById('currentStatus').textContent = '🔗 Stream open — waiting for first status…';
+};
+evtSource.onerror = () => {
+  document.getElementById('currentStatus').textContent =
+    '❌ Stream disconnected. Restart the Flask server (python -m webapp) and try again. Check the terminal for traceback.';
+};
+
+evtSource.onmessage = function(event) {
+  const data = JSON.parse(event.data);
+  if (data.status) { document.getElementById('currentStatus').textContent = '🔄 ' + data.status; return; }
+  if (data.complete) {
+    evtSource.close();
+    document.getElementById('currentStatus').textContent = data.stopped
+      ? '⏹ Stopped — configuration saved below'
+      : '✅ Comparison complete!';
+    const stopBtn = document.getElementById('stopBtn');
+    if (stopBtn) {
+      stopBtn.disabled = true;
+      stopBtn.textContent = data.stopped ? '⏹ Stopped' : '⏹ Stop & save config';
+    }
+    if (window.__kiqflMarkStopped) {
+      window.__kiqflMarkStopped();
+      window.__kiqflStopPending = false;
+    }
+    if (data.checkpoint) KiqflCheckpoint.show(data.checkpoint);
+    document.getElementById('downloadSection').style.display = 'flex';
+    updateSummaryTable();
+    return;
+  }
+  if (data.error) { document.getElementById('currentStatus').textContent = '❌ ' + data.error; evtSource.close(); return; }
+  const method = data.method;
+  if (!allData[method]) allData[method] = { epochs: [], accuracy: [], loss: [], fidelity: [] };
+  allData[method].epochs.push(data.global_epoch);
+  allData[method].accuracy.push(data.accuracy);
+  allData[method].loss.push(data.loss);
+  allData[method].fidelity.push(data.fidelity || 0);
+  document.getElementById('currentStatus').textContent = `🔄 ${method} — Epoch ${data.global_epoch}: Acc ${(data.accuracy*100).toFixed(1)}%`;
+  updateCharts();
+  addDetailRow(data);
+};
+
+function updateCharts() {
+  let maxEpochs = 0;
+  for (const m in allData) maxEpochs = Math.max(maxEpochs, allData[m].epochs.length);
+  const labels = Array.from({length: maxEpochs}, (_, i) => i + 1);
+  if (!accuracyChart) return;
+  const makeDatasets = (key) => Object.keys(allData).map(method => {
+    const c = colorFor(method);
+    return { label: method, data: allData[method][key], borderColor: c.line, backgroundColor: c.fill, fill: false, tension: 0.3 };
+  });
+  accuracyChart.data.labels = labels; accuracyChart.data.datasets = makeDatasets('accuracy'); accuracyChart.update('none');
+  lossChart.data.labels = labels; lossChart.data.datasets = makeDatasets('loss'); lossChart.update('none');
+  const fidelityMethods = Object.keys(allData).filter(m => allData[m].fidelity.some(f => f > 0));
+  fidelityChart.data.labels = labels;
+  fidelityChart.data.datasets = fidelityMethods.map(method => {
+    const c = colorFor(method);
+    return { label: method, data: allData[method].fidelity, borderColor: c.line, backgroundColor: c.fill, fill: false, tension: 0.3 };
+  });
+  fidelityChart.update('none');
+}
+
+function addDetailRow(data) {
+  const row = document.createElement('tr');
+  const cls = 'method-' + data.method.toLowerCase().replace(/[^a-z]/g, '');
+  row.innerHTML = `<td><span class="method-badge ${cls}">${data.method}</span></td><td>${data.global_epoch}</td><td>${data.loss.toFixed(4)}</td><td>${(data.accuracy*100).toFixed(2)}%</td><td>${data.fidelity ? data.fidelity.toFixed(4) : 'N/A'}</td>`;
+  document.getElementById('detailBody').appendChild(row);
+}
+
+function updateSummaryTable() {
+  const tbody = document.getElementById('summaryBody');
+  tbody.innerHTML = '';
+  for (const method in allData) {
+    const d = allData[method];
+    const cls = 'method-' + method.toLowerCase().replace(/[^a-z]/g, '');
+    tbody.innerHTML += `<tr>
+      <td><span class="method-badge ${cls}">${method}</span></td>
+      <td><strong>${(d.accuracy.at(-1)*100).toFixed(2)}%</strong></td>
+      <td>${d.loss.at(-1).toFixed(4)}</td>
+      <td>${d.fidelity.some(f=>f>0) ? (d.fidelity.reduce((a,b)=>a+b)/d.fidelity.length).toFixed(4) : 'N/A'}</td>
+      <td>${(Math.max(...d.accuracy)*100).toFixed(2)}%</td>
+    </tr>`;
+  }
+}
+
+function downloadCSV() {
+  let csv = 'Method,Epoch,Loss,Accuracy,Fidelity\n';
+  for (const method in allData) {
+    const d = allData[method];
+    for (let i = 0; i < d.epochs.length; i++) csv += `${method},${d.epochs[i]},${d.loss[i]},${d.accuracy[i]},${d.fidelity[i]||''}\n`;
+  }
+  const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([csv], {type:'text/csv'}));
+  a.download = `kiqfl_comparison_${config.dataset}.csv`; a.click();
+}
+function downloadAccuracyPNG() { KiqflChartExport.downloadChartPng(accuracyChart, "accuracy.png"); }
+function downloadLossPNG() { KiqflChartExport.downloadChartPng(lossChart, "loss.png"); }
+function downloadFidelityPNG() { KiqflChartExport.downloadChartPng(fidelityChart, "fidelity.png"); }
+
+function countCompletedEpochs() {
+  let maxEpoch = 0;
+  for (const method in allData) {
+    const epochs = allData[method].epochs;
+    if (epochs.length) maxEpoch = Math.max(maxEpoch, epochs[epochs.length - 1]);
+  }
+  return maxEpoch;
+}
+
+document.getElementById('stopBtn').onclick = () => {
+  KiqflCheckpoint.stopAndSave(evtSource, 'comparison', config, countCompletedEpochs())
+    .then(() => {
+      document.getElementById('downloadSection').style.display = 'flex';
+      updateSummaryTable();
+    });
+};
+</script>
+{% endblock %}

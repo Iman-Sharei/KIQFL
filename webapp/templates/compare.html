@@ -1,0 +1,98 @@
+{% extends "base.html" %}
+{% block title %}Compare Algorithms{% endblock %}
+
+{% block page_header %}
+<div class="page-header">
+  <h2>📊 Algorithm Comparison</h2>
+  <p>Compare KIQFL against classical and quantum baselines under shared settings.</p>
+</div>
+{% endblock %}
+
+{% block content %}
+<form class="form-card" action="/start_comparison" method="post" id="comparison-form">
+
+  <div class="form-section">
+    <h3>🔬 Select Algorithms</h3>
+    <div class="checkbox-grid">
+      <label class="checkbox-item"><input type="checkbox" name="algorithms" value="kiqfl" checked><span><strong>KIQFL</strong> — Your Algorithm</span></label>
+      <label class="checkbox-item"><input type="checkbox" name="algorithms" value="fedavg" checked><span><strong>FedAvg</strong> — Classical Baseline</span></label>
+      <label class="checkbox-item"><input type="checkbox" name="algorithms" value="fqngd"><span><strong>FQNGD</strong> — Quantum Baseline</span></label>
+      <label class="checkbox-item"><input type="checkbox" name="algorithms" value="centralized"><span><strong>Centralized</strong> — Upper Bound</span></label>
+    </div>
+    <p class="help-text">On CPU, keep Quick Test small (few rounds / qubits). Full 4-algorithm runs can take a long time.</p>
+  </div>
+
+  <div class="form-section cyan">
+    <h3>📁 Dataset</h3>
+    <select name="dataset" id="dataset">
+      <option value="mnist" selected>MNIST</option>
+      <option value="fashion_mnist">Fashion-MNIST</option>
+      <option value="cifar10">CIFAR-10</option>
+      <option value="cifar100">CIFAR-100</option>
+    </select>
+    <p class="help-text">Start with MNIST for quick tests; use CIFAR for longer runs.</p>
+  </div>
+
+  <div class="form-section green">
+    <h3>🌐 Federated Parameters</h3>
+    <div class="form-grid">
+      <div><label for="num_clients">Clients</label><input type="number" id="num_clients" name="num_clients" min="2" max="20" value="5"></div>
+      <div><label for="local_epochs">Local Epochs</label><input type="number" id="local_epochs" name="local_epochs" min="1" max="10" value="3"></div>
+      <div><label for="global_epochs">Global Rounds</label><input type="number" id="global_epochs" name="global_epochs" min="10" max="200" value="50"></div>
+      <div><label for="learning_rate">Learning Rate</label><input type="text" id="learning_rate" name="learning_rate" value="0.01"></div>
+    </div>
+  </div>
+
+  <div class="form-section amber">
+    <h3>⚛️ Quantum Parameters</h3>
+    <div class="form-grid">
+      <div><label for="num_qubits">Qubits (n)</label><input type="number" id="num_qubits" name="num_qubits" min="4" max="12" value="8"></div>
+      <div><label for="num_layers">Layers (L)</label><input type="number" id="num_layers" name="num_layers" min="1" max="5" value="2"></div>
+      <div><label for="nisq_error_rate">NISQ Error Rate</label><input type="text" id="nisq_error_rate" name="nisq_error_rate" value="0.01"></div>
+      <div><label for="data_fraction">Data Fraction</label><input type="text" id="data_fraction" name="data_fraction" value="0.1"></div>
+    </div>
+  </div>
+
+  <div class="form-section">
+    <h3>🌟 KIQFL-Specific</h3>
+    <div class="form-grid">
+      <div><label for="sporadic_p">Sporadic Probability</label><input type="text" id="sporadic_p" name="sporadic_p" value="0.1"></div>
+      <div><label for="theta_walk">Walk θ (rad)</label><input type="text" id="theta_walk" name="theta_walk" value="0.524"></div>
+      <div><label for="phi_walk">Walk φ (rad)</label><input type="text" id="phi_walk" name="phi_walk" value="0.0"></div>
+    </div>
+  </div>
+
+  <div class="form-section cyan">
+    <h3>⚡ Quick Presets</h3>
+    <div class="preset-bar">
+      <button type="button" class="preset-btn quick" onclick="loadPreset('quick')">🚀 Quick Test</button>
+      <button type="button" class="preset-btn thesis" onclick="loadPreset('thesis')">Full evaluation</button>
+      <button type="button" class="preset-btn noise" onclick="loadPreset('noise')">🛡️ High Noise</button>
+    </div>
+  </div>
+
+  <div class="text-center mt-2">
+    <button type="submit" class="btn btn-primary">🚀 Start Comparison</button>
+  </div>
+</form>
+{% endblock %}
+
+{% block scripts %}
+<script src="{{ url_for('static', filename='checkpoint.js') }}"></script>
+<script>
+function loadPreset(preset) {
+  const p = {
+    quick: { dataset:'mnist', num_clients:2, local_epochs:1, global_epochs:3, num_qubits:4, num_layers:1, data_fraction:0.02 },
+    thesis: { dataset:'mnist', num_clients:10, local_epochs:3, global_epochs:100, num_qubits:8, num_layers:2, data_fraction:0.2 },
+    noise: { dataset:'mnist', num_clients:5, local_epochs:3, global_epochs:50, num_qubits:8, num_layers:2, nisq_error_rate:0.05, sporadic_p:0.2, data_fraction:0.1 }
+  }[preset];
+  if (!p) return;
+  Object.keys(p).forEach(k => { const el = document.getElementById(k); if (el) el.value = p[k]; });
+  if (preset === 'quick') {
+    document.querySelectorAll('input[name="algorithms"]').forEach(cb => {
+      cb.checked = (cb.value === 'kiqfl' || cb.value === 'fedavg');
+    });
+  }
+}
+</script>
+{% endblock %}

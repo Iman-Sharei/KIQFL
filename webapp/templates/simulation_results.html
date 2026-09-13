@@ -1,0 +1,150 @@
+{% extends "base.html" %}
+{% block title %}Simulation Results{% endblock %}
+
+{% block extra_head %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+{% endblock %}
+
+{% block page_header %}
+<div class="page-header">
+  <h2>📈 Simulation Results</h2>
+  <p>Live training metrics streamed from the federated learning backend.</p>
+</div>
+{% endblock %}
+
+{% block content %}
+<div class="summary-box" id="simulationSummary">
+  Running <strong>{{ dataset }}</strong> with <strong>{{ num_clients }}</strong> clients,
+  <strong>{{ local_epochs }}</strong> local epochs, <strong>{{ global_epochs }}</strong> global epochs.
+  {% if num_qubits and num_layers %}
+  <br>Quantum: <strong>{{ num_qubits }}</strong> qubits, <strong>{{ num_layers }}</strong> layers.
+  {% endif %}
+  {% if fl_type == "quantum_federated" %}
+  <ul>
+    <li>Encoding: {{ quantum_encoding }} · Ansatz: {{ ansatz }}</li>
+    <li>Optimizer: {{ optimizer_choice }} · LR: {{ learning_rate }}</li>
+    <li>Sporadic p: {{ sporadic_p }} · NISQ error: {{ nisq_error_rate }}</li>
+  </ul>
+  {% endif %}
+</div>
+
+<div class="status-pill" id="statusPill">⏳ Connecting to simulation stream…</div>
+
+<div class="btn-group">
+  <a href="/simulate" class="btn btn-ghost">← Back to Setup</a>
+  <button id="stopBtn" class="btn btn-danger">⏹ Stop &amp; save config</button>
+  <button id="downloadBtn" class="btn btn-success" style="display:none;">📥 Download CSV</button>
+  <button id="downloadLossPNGBtn" class="btn btn-secondary" style="display:none;">Loss PNG</button>
+  <button id="downloadLossPDFBtn" class="btn btn-secondary" style="display:none;">Loss PDF</button>
+  <button id="downloadAccPNGBtn" class="btn btn-secondary" style="display:none;">Accuracy PNG</button>
+  <button id="downloadAccPDFBtn" class="btn btn-secondary" style="display:none;">Accuracy PDF</button>
+</div>
+
+<table class="results-table" id="resultsTable">
+  <thead><tr><th>Epoch</th><th>Test Loss</th><th>Test Accuracy</th></tr></thead>
+  <tbody></tbody>
+</table>
+
+<div class="chart-grid">
+  <div class="chart-wrap"><canvas id="lossChart"></canvas></div>
+  <div class="chart-wrap"><canvas id="accuracyChart"></canvas></div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script src="{{ url_for('static', filename='chart-export.js') }}"></script>
+<script src="{{ url_for('static', filename='checkpoint.js') }}"></script>
+<script>
+const params = {
+  fl_type: "{{ fl_type }}", dataset: "{{ dataset }}", num_clients: "{{ num_clients }}",
+  data_type: "{{ data_type }}", local_epochs: "{{ local_epochs }}", global_epochs: "{{ global_epochs }}",
+  num_qubits: "{{ num_qubits }}", num_layers: "{{ num_layers }}",
+  quantum_encoding: "{{ quantum_encoding }}", ansatz: "{{ ansatz }}",
+  measurement: "{{ measurement }}", differential: "{{ differential }}",
+  loss_function: "{{ loss_function }}", optimizer_choice: "{{ optimizer_choice }}",
+  learning_rate: "{{ learning_rate }}", sporadic_p: "{{ sporadic_p }}",
+  theta_walk: "{{ theta_walk }}", phi_walk: "{{ phi_walk }}",
+  data_fraction: "{{ data_fraction|default('0.1') }}"
+};
+const evtSource = new EventSource("/stream_simulation?" + new URLSearchParams(params));
+const tableBody = document.querySelector("#resultsTable tbody");
+const epochs = [], lossData = [], accuracyData = [];
+
+const chartOpts = {
+  responsive: true,
+  plugins: { legend: { labels: { color: '#94a3b8' } } },
+  scales: {
+    x: { ticks: { color: '#94a3b8' }, grid: { color: 'rgba(148,163,184,0.1)' } },
+    y: { ticks: { color: '#94a3b8' }, grid: { color: 'rgba(148,163,184,0.1)' } }
+  }
+};
+
+const lossChart = new Chart(document.getElementById('lossChart'), {
+  type: 'line',
+  data: { labels: epochs, datasets: [{ label: 'Test Loss', data: lossData, borderColor: '#fb7185', backgroundColor: 'rgba(251,113,133,0.15)', fill: true, tension: 0.3 }] },
+  options: chartOpts
+});
+const accuracyChart = new Chart(document.getElementById('accuracyChart'), {
+  type: 'line',
+  data: { labels: epochs, datasets: [{ label: 'Test Accuracy', data: accuracyData, borderColor: '#22d3ee', backgroundColor: 'rgba(34,211,238,0.12)', fill: true, tension: 0.3 }] },
+  options: chartOpts
+});
+
+function showDownloads() {
+  ['downloadBtn','downloadLossPNGBtn','downloadLossPDFBtn','downloadAccPNGBtn','downloadAccPDFBtn'].forEach(id => {
+    document.getElementById(id).style.display = 'inline-flex';
+  });
+}
+
+evtSource.onopen = () => { document.getElementById('statusPill').textContent = '🔗 Live stream connected — training started'; };
+evtSource.onerror = () => {
+  const pill = document.getElementById('statusPill');
+  if (pill && !pill.textContent.startsWith('⏹') && !pill.textContent.startsWith('✅')) {
+    pill.textContent = '❌ Stream disconnected — restart python -m webapp and check the terminal.';
+  }
+};
+evtSource.onmessage = function(event) {
+  const result = JSON.parse(event.data);
+  if (result.status) {
+    document.getElementById('statusPill').textContent = '🔗 ' + (result.message || result.status);
+    return;
+  }
+  if (result.error) { document.getElementById('statusPill').textContent = '❌ ' + result.error; evtSource.close(); return; }
+  if (result.complete) {
+    evtSource.close();
+    document.getElementById('statusPill').textContent = result.stopped ? '⏹ Stopped — config saved' : '✅ Simulation complete';
+    const stopBtn = document.getElementById('stopBtn');
+    if (stopBtn) {
+      stopBtn.disabled = true;
+      stopBtn.textContent = result.stopped ? '⏹ Stopped' : '⏹ Stop';
+    }
+    if (window.__kiqflMarkStopped) {
+      window.__kiqflMarkStopped();
+      window.__kiqflStopPending = false;
+    }
+    if (result.checkpoint) KiqflCheckpoint.show(result.checkpoint);
+    showDownloads();
+    return;
+  }
+  const row = document.createElement("tr");
+  row.innerHTML = `<td>${result.global_epoch}</td><td>${result.loss.toFixed(4)}</td><td>${(result.accuracy * 100).toFixed(2)}%</td>`;
+  tableBody.appendChild(row);
+  epochs.push(result.global_epoch);
+  lossData.push(result.loss);
+  accuracyData.push(result.accuracy);
+  lossChart.update();
+  accuracyChart.update();
+  document.getElementById('statusPill').textContent = `🔄 Epoch ${result.global_epoch} — Loss: ${result.loss.toFixed(4)}, Acc: ${(result.accuracy*100).toFixed(1)}%`;
+};
+
+document.getElementById("downloadBtn").onclick = () => { window.location.href = "/download_csv"; };
+document.getElementById("downloadLossPNGBtn").onclick = () => KiqflChartExport.downloadChartPng(lossChart, "loss_chart.png");
+document.getElementById("downloadAccPNGBtn").onclick = () => KiqflChartExport.downloadChartPng(accuracyChart, "accuracy_chart.png");
+document.getElementById("downloadLossPDFBtn").onclick = () => { const { jsPDF } = window.jspdf; const pdf = new jsPDF(); pdf.addImage(KiqflChartExport.chartDataUrl(lossChart), "PNG", 15, 40, 180, 160); pdf.save("loss_chart.pdf"); };
+document.getElementById("downloadAccPDFBtn").onclick = () => { const { jsPDF } = window.jspdf; const pdf = new jsPDF(); pdf.addImage(KiqflChartExport.chartDataUrl(accuracyChart), "PNG", 15, 40, 180, 160); pdf.save("accuracy_chart.pdf"); };
+document.getElementById("stopBtn").onclick = () => {
+  KiqflCheckpoint.stopAndSave(evtSource, "classification", params, epochs.length);
+};
+</script>
+{% endblock %}

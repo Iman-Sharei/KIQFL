@@ -1,0 +1,96 @@
+{% extends "base.html" %}
+{% block title %}Home{% endblock %}
+
+{% block content %}
+<section class="hero">
+  <div>
+    <span class="hero-kicker">Central-server federated learning</span>
+    <h2>Federated learning with a<br><span class="highlight">quantum sense of agreement.</span></h2>
+    <p class="hero-lead">
+      <strong>KIQFL</strong> (KAN-Enhanced Indirect Quantum Federated Learning) is a hybrid
+      quantum–classical simulator for studying how clients can train locally while a
+      <strong>central server</strong> aggregates updates. Circuit-state fidelity—optionally
+      mixed by a ring DTQW and softened by a KAN—guides how much each client contributes.
+      It is classical state-vector simulation for research, not a claim of QPU speedup.
+    </p>
+    <div class="hero-actions">
+      <a href="/choose" class="btn btn-primary">Start a simulation</a>
+      <a href="/about" class="btn btn-secondary">Read the method</a>
+    </div>
+  </div>
+  <div class="hero-visual">
+    <img src="{{ url_for('static', filename='images/hero-ring-walk.png') }}?v=2" alt="Geometric ring of walk nodes around a central server with four clients">
+    <div class="hero-caption">
+      <h3>Clients → central server · ring DTQW for guidance weights</h3>
+      <div class="stat-row">
+        <div class="stat-item"><strong style="color:var(--green)">FedAvg</strong><span>Fair baseline</span></div>
+        <div class="stat-item"><strong style="color:var(--amber)">NISQ</strong><span>Noise-aware runs</span></div>
+        <div class="stat-item"><strong style="color:var(--accent-deep)">KIQFL</strong><span>Fidelity-guided</span></div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section>
+  <h2 class="section-title">What this system does</h2>
+  <p class="section-intro">
+    Run federated training with hybrid quantum–classical clients, compare algorithms side by side,
+    and explore how sparse participation and simulated noise affect accuracy, loss, and fidelity.
+  </p>
+  <div class="card-grid">
+    <div class="feature-card">
+      <div class="icon">🖥️</div>
+      <h3>Central server FL</h3>
+      <p>Star topology end to end: broadcast the global model, train on private data, upload updates, aggregate on the server, repeat.</p>
+    </div>
+    <div class="feature-card">
+      <div class="icon">🌀</div>
+      <h3>Quantum-walk guidance</h3>
+      <p>A discrete-time walk on a ring mixes <em>circuit states</em> used only to form fidelity weights—not a peer-to-peer parameter exchange.</p>
+    </div>
+    <div class="feature-card">
+      <div class="icon">🧩</div>
+      <h3>KAN soft mixing</h3>
+      <p>A small Kolmogorov–Arnold network sets a soft mixing strength α from noise, fidelity, and training progress.</p>
+    </div>
+    <div class="feature-card">
+      <div class="icon">⚛️</div>
+      <h3>Hybrid CNN–QNN</h3>
+      <p>Classical features feed amplitude encoding and a parameterized circuit; measurement probabilities drive the classical head.</p>
+    </div>
+    <div class="feature-card">
+      <div class="icon">🛡️</div>
+      <h3>NISQ-aware stress tests</h3>
+      <p>Sporadic client updates and configurable error rates help probe robustness under imperfect device conditions.</p>
+    </div>
+    <div class="feature-card">
+      <div class="icon">🔒</div>
+      <h3>Data stays local</h3>
+      <p>Raw samples never leave the client. Only parameters—and optional circuit states—reach the server.</p>
+    </div>
+  </div>
+</section>
+
+<section style="margin-top:2.75rem;">
+  <h2 class="section-title">Architecture at a glance</h2>
+  <p class="section-intro">
+    Clients keep private datasets. The server owns the global model.
+    The ring walk is a guidance mechanism around that hub—not a replacement for it.
+  </p>
+  <figure class="figure-block">
+    <img src="{{ url_for('static', filename='images/arch-central-server.png') }}?v=2" alt="Diagram of federated clients sending updates to a central server with DTQW guidance ring">
+    <figcaption>Central-server federated loop with ring DTQW used for fidelity guidance.</figcaption>
+  </figure>
+</section>
+
+<section>
+  <h2 class="section-title">Supported datasets</h2>
+  <div class="dataset-pills">
+    <div class="dataset-pill"><div class="icon">✏️</div><strong>MNIST</strong><small>Handwritten digits</small></div>
+    <div class="dataset-pill"><div class="icon">👕</div><strong>Fashion-MNIST</strong><small>Clothing items</small></div>
+    <div class="dataset-pill"><div class="icon">🖼️</div><strong>CIFAR-10</strong><small>10 object classes</small></div>
+    <div class="dataset-pill"><div class="icon">🎨</div><strong>CIFAR-100</strong><small>100 fine classes</small></div>
+    <div class="dataset-pill"><div class="icon">📄</div><strong>Custom CSV</strong><small>Regression tasks</small></div>
+  </div>
+</section>
+{% endblock %}

@@ -1,0 +1,159 @@
+{% extends "base.html" %}
+{% block title %}Configure Simulation{% endblock %}
+
+{% block page_header %}
+<div class="page-header">
+  <h2>⚙️ Configure Simulation</h2>
+  <p>Customize hyperparameters for KIQFL or classical federated learning experiments.</p>
+</div>
+{% endblock %}
+
+{% block content %}
+<form class="form-card" id="simulationForm" action="/start_simulation" method="post">
+
+  <div class="form-section">
+    <h3>📊 Basic Configuration</h3>
+    <label for="fl_type">Federated Learning Type</label>
+    <select id="fl_type" name="fl_type">
+      <option value="quantum_federated" selected>⚛️ Quantum Federated Learning (KIQFL)</option>
+      <option value="federated">🖥️ Classical Federated Learning (FedAvg)</option>
+    </select>
+    <label for="dataset">Dataset</label>
+    <select id="dataset" name="dataset">
+      <option value="mnist" selected>MNIST (Handwritten Digits)</option>
+      <option value="fashion_mnist">Fashion-MNIST (Clothing Items)</option>
+      <option value="cifar10">CIFAR-10 (10 Object Classes)</option>
+      <option value="cifar100">CIFAR-100 (100 Fine Classes)</option>
+    </select>
+  </div>
+
+  <div class="form-section green">
+    <h3>🌐 Federated Learning Parameters</h3>
+    <div class="form-grid">
+      <div>
+        <label for="num_clients">Number of Clients</label>
+        <input type="number" id="num_clients" name="num_clients" min="2" max="20" value="5">
+      </div>
+      <div>
+        <label for="local_epochs">Local Epochs</label>
+        <input type="number" id="local_epochs" name="local_epochs" min="1" max="20" value="3">
+      </div>
+      <div>
+        <label for="global_epochs">Global Epochs</label>
+        <input type="number" id="global_epochs" name="global_epochs" min="1" max="500" value="50">
+      </div>
+          <div>
+            <label for="learning_rate">Learning Rate</label>
+            <input type="number" id="learning_rate" name="learning_rate" min="0.0001" max="1" step="any" value="0.01">
+          </div>
+          <div>
+            <label for="data_fraction">Data fraction</label>
+            <input type="number" id="data_fraction" name="data_fraction" min="0.005" max="1" step="any" value="0.1">
+            <p class="help-text">Share of the dataset used (0.1 = 10%). Lower is faster.</p>
+          </div>
+        </div>
+      </div>
+
+  <div class="form-section amber">
+    <h3>⚛️ Quantum Circuit Parameters</h3>
+    <div class="form-grid">
+      <div>
+        <label for="num_qubits">Number of Qubits (n)</label>
+        <input type="number" id="num_qubits" name="num_qubits" min="4" max="14" value="8">
+        <p class="help-text">State space = 2^n</p>
+      </div>
+      <div>
+        <label for="num_layers">Quantum Layers (L)</label>
+        <input type="number" id="num_layers" name="num_layers" min="1" max="5" value="2">
+      </div>
+    </div>
+    <label for="quantum_encoding">Quantum Encoding</label>
+    <select id="quantum_encoding" name="quantum_encoding">
+      <option value="amplitude" selected>Amplitude Encoding</option>
+    </select>
+    <label for="ansatz">Ansatz Architecture</label>
+    <select id="ansatz" name="ansatz">
+      <option value="ry_cx" selected>Parameterized Quantum Circuit (Ry + CX)</option>
+    </select>
+    <label for="measurement">Measurement</label>
+    <select id="measurement" name="measurement">
+      <option value="probability" selected>Probability (Pauli-Z)</option>
+    </select>
+    <label for="differential">Differentiation</label>
+    <select id="differential" name="differential">
+      <option value="parameter_shift" selected>Parameter Shift</option>
+    </select>
+    <label for="loss_function">Loss Function</label>
+    <select id="loss_function" name="loss_function">
+      <option value="cross_entropy" selected>Cross Entropy</option>
+    </select>
+    <label for="optimizer">Optimizer</label>
+    <select id="optimizer" name="optimizer">
+      <option value="adam" selected>Adam</option>
+    </select>
+  </div>
+
+  <fieldset>
+    <legend>🌟 KIQFL Advanced Parameters</legend>
+    <p class="help-text">Applicable for Quantum Federated Learning mode</p>
+    <div class="form-grid">
+      <div>
+        <label for="sporadic_p">Sporadic Probability</label>
+        <input type="number" id="sporadic_p" name="sporadic_p" min="0" max="0.5" step="any" value="0.1">
+      </div>
+      <div>
+        <label for="nisq_error_rate">NISQ Error Rate</label>
+        <input type="number" id="nisq_error_rate" name="nisq_error_rate" min="0" max="0.1" step="any" value="0.01">
+      </div>
+      <div>
+        <label for="theta_walk">Quantum Walk θ (rad)</label>
+        <input type="number" id="theta_walk" name="theta_walk" min="0" max="3.14159" step="any" value="0.524">
+      </div>
+      <div>
+        <label for="phi_walk">Quantum Walk φ (rad)</label>
+        <input type="number" id="phi_walk" name="phi_walk" min="0" max="6.28318" step="any" value="0.0">
+      </div>
+    </div>
+  </fieldset>
+
+  <div class="form-section cyan">
+    <h3>⚡ Quick Presets</h3>
+    <div class="preset-bar">
+      <button type="button" class="preset-btn quick" onclick="loadPreset('quick_test')">🚀 Quick Test</button>
+      <button type="button" class="preset-btn baseline" onclick="loadPreset('baseline')">📊 Baseline</button>
+      <button type="button" class="preset-btn advanced" onclick="loadPreset('advanced')">🎯 Advanced</button>
+      <button type="button" class="preset-btn noise" onclick="loadPreset('noise_test')">🛡️ High Noise</button>
+    </div>
+  </div>
+
+  <div class="text-center mt-2">
+    <button type="submit" class="btn btn-success">▶️ Start Simulation</button>
+  </div>
+</form>
+{% endblock %}
+
+{% block scripts %}
+<script>
+function loadPreset(preset) {
+  const presets = {
+    quick_test: { dataset:'mnist', num_clients:2, num_qubits:4, num_layers:1, local_epochs:1, global_epochs:3, learning_rate:0.01, sporadic_p:0.1, theta_walk:0.524, data_fraction:0.02 },
+    baseline: { dataset:'mnist', num_clients:5, num_qubits:8, num_layers:2, local_epochs:3, global_epochs:50, learning_rate:0.01, sporadic_p:0.1, theta_walk:0.524, data_fraction:0.1 },
+    advanced: { dataset:'cifar10', num_clients:8, num_qubits:10, num_layers:2, local_epochs:5, global_epochs:100, learning_rate:0.005, sporadic_p:0.15, theta_walk:0.785, data_fraction:0.1 },
+    noise_test: { dataset:'mnist', num_clients:5, num_qubits:8, num_layers:2, local_epochs:3, global_epochs:50, learning_rate:0.01, sporadic_p:0.3, theta_walk:0.524, nisq_error_rate:0.05, data_fraction:0.1 }
+  };
+  const p = presets[preset];
+  if (!p) return;
+  Object.keys(p).forEach(k => { const el = document.getElementById(k); if (el) el.value = p[k]; });
+}
+
+document.addEventListener("DOMContentLoaded", () => {
+  const skip = new Set(["resume", "completed_epochs", "type", "total_epochs", "stopped"]);
+  const q = new URLSearchParams(window.location.search);
+  q.forEach((value, key) => {
+    if (skip.has(key)) return;
+    const el = document.getElementById(key);
+    if (el) el.value = value;
+  });
+});
+</script>
+{% endblock %}
