@@ -1,0 +1,13 @@
+cff-version: 1.2.0
+message: "If you use KIQFL in your research, please cite it as below."
+title: "KIQFL: KAN-Enhanced Indirect Quantum Federated Learning"
+authors:
+  - family-names: Sharei
+    given-names: Iman
+repository-code: "https://github.com/Iman-Sharei/KIQFL"
+license: MIT
+keywords:
+  - quantum federated learning
+  - hybrid quantum-classical
+  - Kolmogorov-Arnold Network
+  - discrete-time quantum walk
